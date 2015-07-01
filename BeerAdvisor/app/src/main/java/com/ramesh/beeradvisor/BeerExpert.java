@@ -3,9 +3,10 @@ package com.ramesh.beeradvisor;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Created by rviswana on 6/30/2015.
- */
+/*************************************************************************
+ * BeerExpert class defines getBrands public method.  This method returns
+ *  a list of beer types that has the input color.
+ ************************************************************************/
 public class BeerExpert {
     public List<String> getBrands(String color) {
         List<String> retStr = new ArrayList<String>();
