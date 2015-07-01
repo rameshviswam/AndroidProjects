@@ -4,4 +4,10 @@
     <string name="button_name">Find_Beer</string>
     <string name="text_name">"Brands</string>
     <string name="action_settings">Settings</string>
+    <string-array name="beer_colors">
+        <item>amber</item>
+        <item>light</item>
+        <item>dark</item>
+        <item>brown</item>
+    </string-array>
 </resources>
