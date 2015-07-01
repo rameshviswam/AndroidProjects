@@ -1,6 +1,7 @@
 <resources>
     <string name="app_name">BeerAdvisor</string>
 
-    <string name="hello_world">Hello world!</string>
+    <string name="button_name">Find_Beer</string>
+    <string name="text_name">"Brands</string>
     <string name="action_settings">Settings</string>
 </resources>
