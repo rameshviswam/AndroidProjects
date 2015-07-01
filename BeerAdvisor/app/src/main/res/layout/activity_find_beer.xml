@@ -20,7 +20,8 @@
         android:id="@+id/find_beer"
         android:layout_below="@+id/color_spinner"
         android:layout_alignLeft="@+id/color_spinner"
-        android:text="@string/button_name" />
+        android:text="@string/button_name"
+        android:onClick="onClickFindBeer" />
 
     <TextView
         android:layout_width="wrap_content"
