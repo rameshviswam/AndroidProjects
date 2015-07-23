@@ -25,14 +25,12 @@ import android.widget.Toast;
 
 import java.util.Arrays;
 
-
 public class RV_Camera extends Activity {
     private TextureView mTextureView;
     private Size mPreviewSize;
     private CameraDevice mCamDevice;
     private CaptureRequest.Builder mPreviewBuilder;
     private CameraCaptureSession mPreviewSession;
-
 
     protected void updatePreview() {
         if(null == mCamDevice) {
@@ -51,6 +49,19 @@ public class RV_Camera extends Activity {
             e.printStackTrace();
         }
     }
+
+    private CameraCaptureSession.StateCallback mCameraCaptureSessionCallback  = new CameraCaptureSession.StateCallback() {
+        @Override
+        public void onConfigured(CameraCaptureSession session) {
+            mPreviewSession = session;
+            updatePreview();
+        }
+
+        @Override
+        public void onConfigureFailed(CameraCaptureSession session) {
+            Toast.makeText(RV_Camera.this, "onConfigureFailed", Toast.LENGTH_LONG).show();
+        }
+    };
 
     protected void startPreview(){
         if(null == mCamDevice || !mTextureView.isAvailable() || null == mPreviewSize) {
@@ -79,32 +90,9 @@ public class RV_Camera extends Activity {
 
         try {
 
-            mCamDevice.createCaptureSession(Arrays.asList(surface), new CameraCaptureSession.StateCallback() {
-                @Override
-                public void onConfigured(CameraCaptureSession session) {
-                    mPreviewSession = session;
-                    updatePreview();
-                }
-
-                @Override
-                public void onConfigureFailed(CameraCaptureSession session) {
-                    //Toast.makeText(RV_Camera.this, "onConfigureFailed", Toast.LENGTH_LONG).show();
-                }
-            }, null);
+            mCamDevice.createCaptureSession(Arrays.asList(surface), mCameraCaptureSessionCallback, null);
         } catch(CameraAccessException e) {
             e.printStackTrace();
-        }
-    }
-
-
-    @Override
-    protected void onPause() {
-
-        Log.e("RV....", "onPause");
-        super.onPause();
-        if (null != mCamDevice) {
-            mCamDevice.close();
-            mCamDevice = null;
         }
     }
 
@@ -182,6 +170,16 @@ public class RV_Camera extends Activity {
 
         //Set surface listener
         mTextureView.setSurfaceTextureListener(mSurfaceTextureListener);
+    }
 
+    @Override
+    protected void onPause() {
+
+        Log.e("RV....", "onPause");
+        super.onPause();
+        if (null != mCamDevice) {
+            mCamDevice.close();
+            mCamDevice = null;
+        }
     }
 }
