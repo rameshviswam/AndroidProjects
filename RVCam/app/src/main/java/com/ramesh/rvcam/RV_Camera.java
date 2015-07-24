@@ -221,20 +221,106 @@ public class RV_Camera extends Activity {
     protected void onPause() {
 
         Log.e("RV....", "onPause");
-        super.onPause();
         if (null != mCamDevice) {
             mCamDevice.close();
             mCamDevice = null;
         }
+        stopBackgroundThread();
+        super.onPause();
     }
 
     @Override
     protected void onResume() {
         super.onResume();
         Log.e("RV...", "onResume");
+        startBackgroundThread();
     }
 
-     public void takePicture() {
+    private Handler mBackgroundHandler;
+    private HandlerThread mBackgroundThread;
+
+
+
+    /**
+     * Starts a background thread and its {@link Handler}.
+     */
+    private void startBackgroundThread() {
+        mBackgroundThread = new HandlerThread("CameraBackground");
+        mBackgroundThread.start();
+        mBackgroundHandler = new Handler(mBackgroundThread.getLooper());
+    }
+
+    /**
+     * Stops the background thread and its {@link Handler}.
+     */
+    private void stopBackgroundThread() {
+        mBackgroundThread.quitSafely();
+        try {
+            mBackgroundThread.join();
+            mBackgroundThread = null;
+            mBackgroundHandler = null;
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+    }
+
+
+
+    private final File file = new File(Environment.getExternalStorageDirectory()+"/DCIM", "rv_pic.jpg");
+
+    private ImageReader.OnImageAvailableListener mReadListener = new ImageReader.OnImageAvailableListener() {
+        @Override
+        public void onImageAvailable(ImageReader reader) {
+            Image img = null;
+
+            try {
+                img = reader.acquireLatestImage();
+                ByteBuffer buf = img.getPlanes()[0].getBuffer();
+                byte[] bytes = new byte[buf.capacity()];
+                buf.get(bytes);
+                testServer.sendSnapshotResponse(4, bytes);
+                save(bytes);
+            }
+            catch(FileNotFoundException e) {
+                e.printStackTrace();
+            } catch(IOException e) {
+                e.printStackTrace();
+            }
+            finally {
+                if (img != null) {
+                    img.close();
+                }
+            }
+        }
+        private void save(byte[] bytes) throws IOException {
+            OutputStream output = null;
+            try {
+                output = new FileOutputStream(file);
+                output.write(bytes);
+            } finally {
+                if (null != output) {
+                    output.close();
+                }
+            }
+        }
+    };
+
+
+    private final CameraCaptureSession.CaptureCallback mCaptureListener = new CameraCaptureSession.CaptureCallback() {
+
+        @Override
+        public void onCaptureCompleted(CameraCaptureSession session,
+                                       CaptureRequest request, TotalCaptureResult result) {
+
+            super.onCaptureCompleted(session, request, result);
+            Toast.makeText(RV_Camera.this, "Saved:"+file, Toast.LENGTH_SHORT).show();
+            startPreview();
+        }
+
+    };
+
+
+    public void takePicture() {
         if(null == mCamDevice){
             Log.e("RV...", "Camera device is null");
             return;
@@ -279,66 +365,8 @@ public class RV_Camera extends Activity {
             pictureBuilder.set(CaptureRequest.JPEG_ORIENTATION, ORIENTATIONS.get(rotation));
 
 
-            // file creation
-            final File file = new File(Environment.getExternalStorageDirectory()+"/DCIM", "rv_pic.jpg");
+            reader.setOnImageAvailableListener(mReadListener, mBackgroundHandler);
 
-            ImageReader.OnImageAvailableListener readListener = new ImageReader.OnImageAvailableListener() {
-                @Override
-                public void onImageAvailable(ImageReader reader) {
-                    Image img = null;
-
-                    try {
-                       img = reader.acquireLatestImage();
-                        ByteBuffer buf = img.getPlanes()[0].getBuffer();
-                        byte[] bytes = new byte[buf.capacity()];
-                        buf.get(bytes);
-                        testServer.sendSnapshotResponse(4, bytes);
-                        save(bytes);
-                    }
-                    catch(FileNotFoundException e) {
-                        e.printStackTrace();
-                    } catch(IOException e) {
-                        e.printStackTrace();
-                    }
-finally {
-                        if (img != null) {
-                            img.close();
-                        }
-                    }
-                }
-                private void save(byte[] bytes) throws IOException {
-                    OutputStream output = null;
-                    try {
-                        output = new FileOutputStream(file);
-                        output.write(bytes);
-                    } finally {
-                        if (null != output) {
-                            output.close();
-                        }
-                    }
-                }
-            };
-
-
-
-
-            HandlerThread thread = new HandlerThread("CameraPicture");
-            thread.start();
-            final Handler backgroudHandler = new Handler(thread.getLooper());
-            reader.setOnImageAvailableListener(readListener, backgroudHandler);
-
-            final CameraCaptureSession.CaptureCallback captureListener = new CameraCaptureSession.CaptureCallback() {
-
-                @Override
-                public void onCaptureCompleted(CameraCaptureSession session,
-                                               CaptureRequest request, TotalCaptureResult result) {
-
-                    super.onCaptureCompleted(session, request, result);
-                    Toast.makeText(RV_Camera.this, "Saved:"+file, Toast.LENGTH_SHORT).show();
-                    startPreview();
-                }
-
-            };
 
             mCamDevice.createCaptureSession(outputSurfaces, new CameraCaptureSession.StateCallback() {
 
@@ -346,7 +374,7 @@ finally {
                 public void onConfigured(CameraCaptureSession session) {
 
                     try {
-                        session.capture(pictureBuilder.build(), captureListener, backgroudHandler);
+                        session.capture(pictureBuilder.build(), mCaptureListener, mBackgroundHandler);
                     } catch (CameraAccessException e) {
 
                         e.printStackTrace();
@@ -354,19 +382,12 @@ finally {
                 }
 
                 @Override
-                public void onConfigureFailed(CameraCaptureSession session) {
+                public void onConfigureFailed(CameraCaptureSession session) {}
 
-                }
-            }, backgroudHandler);
-
-
-
-
+            }, mBackgroundHandler);
 
         } catch(CameraAccessException e) {
             e.printStackTrace();
         }
-
     }
-
 }
