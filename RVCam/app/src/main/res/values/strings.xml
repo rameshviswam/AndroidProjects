@@ -2,4 +2,6 @@
     <string name="app_name">RVCam</string>
 
     <string name="action_settings">Settings</string>
+    <string name="picture">Take Picture</string>
+
 </resources>

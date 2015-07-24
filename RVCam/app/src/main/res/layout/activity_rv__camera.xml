@@ -12,4 +12,11 @@
         android:layout_alignParentTop="true"
         android:id="@+id/previewTexture"/>
 
+    <Button
+        android:id="@+id/btn_takepicture"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:text="@string/picture" />
+
 </RelativeLayout>
