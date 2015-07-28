@@ -568,6 +568,8 @@ public class Camera2BasicFragment extends Fragment implements View.OnClickListen
             mPreviewRequestBuilder
                     = mCameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW);
             mPreviewRequestBuilder.addTarget(surface);
+            mPreviewRequestBuilder.addTarget(mImageReader.getSurface());
+
 
             // Here, we create a CameraCaptureSession for camera preview.
             mCameraDevice.createCaptureSession(Arrays.asList(surface, mImageReader.getSurface()),
@@ -698,7 +700,7 @@ public class Camera2BasicFragment extends Fragment implements View.OnClickListen
             // This is the CaptureRequest.Builder that we use to take a picture.
             final CaptureRequest.Builder captureBuilder =
                     mCameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_STILL_CAPTURE);
-            captureBuilder.addTarget(mImageReader.getSurface());
+            //captureBuilder.addTarget(mImageReader.getSurface());
 
             // Use the same AE and AF modes as the preview.
             captureBuilder.set(CaptureRequest.CONTROL_AF_MODE,
@@ -796,6 +798,7 @@ public class Camera2BasicFragment extends Fragment implements View.OnClickListen
             FileOutputStream output = null;
             try {
                 output = new FileOutputStream(mFile);
+                Log.e("RV...", "In Image Saver: " + mFile);
                 output.write(bytes);
             } catch (IOException e) {
                 e.printStackTrace();
