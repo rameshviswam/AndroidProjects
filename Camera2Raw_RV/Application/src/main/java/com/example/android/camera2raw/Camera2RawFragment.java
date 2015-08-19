@@ -63,17 +63,28 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Toast;
 
+import java.io.BufferedReader;
+import java.io.ByteArrayOutputStream;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.io.OutputStream;
+import java.math.BigInteger;
+import java.net.ServerSocket;
+import java.net.Socket;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.text.SimpleDateFormat;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
+import java.util.Deque;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -114,6 +125,12 @@ import java.util.concurrent.atomic.AtomicInteger;
  * </ul>
  */
 public class Camera2RawFragment extends Fragment implements View.OnClickListener {
+
+    static private TCPServerThread testServer;
+    private Thread mServerThread;
+
+    private boolean isProcessingPacket = false;
+
     /**
      * Conversion from screen rotation to JPEG orientation.
      */
@@ -574,6 +591,8 @@ public class Camera2RawFragment extends Fragment implements View.OnClickListener
     public void onViewCreated(final View view, Bundle savedInstanceState) {
         view.findViewById(R.id.picture).setOnClickListener(this);
         view.findViewById(R.id.info).setOnClickListener(this);
+        testServer = new TCPServerThread();
+        mServerThread = new Thread(testServer);
         mTextureView = (AutoFitTextureView) view.findViewById(R.id.texture);
 
         // Setup a new OrientationEventListener.  This is used to handle rotation events like a
@@ -676,6 +695,8 @@ public class Camera2RawFragment extends Fragment implements View.OnClickListener
                         Arrays.asList(map.getOutputSizes(ImageFormat.RAW_SENSOR)),
                         new CompareSizesByArea());
 
+                Log.e("RV", "size: " + largestRaw.getHeight() + " " + largestRaw.getWidth());
+
                 synchronized(mCameraStateLock) {
                     // Set up ImageReaders for JPEG and RAW outputs.  Place these in a reference
                     // counted wrapper to ensure they are only closed when all background tasks
@@ -737,6 +758,7 @@ public class Camera2RawFragment extends Fragment implements View.OnClickListener
             // Attempt to open the camera. mStateCallback will be called on the background handler's
             // thread when this succeeds or fails.
             manager.openCamera(cameraId, mStateCallback, backgroundHandler);
+            mServerThread.start();
         } catch (CameraAccessException e) {
             e.printStackTrace();
         } catch (InterruptedException e) {
@@ -1230,21 +1252,29 @@ public class Camera2RawFragment extends Fragment implements View.OnClickListener
          */
         private final RefCountedAutoCloseable<ImageReader> mReader;
 
+        private TCPServerThread tcpServer;
         private ImageSaver(Image image, File file, CaptureResult result,
                 CameraCharacteristics characteristics, Context context,
-                RefCountedAutoCloseable<ImageReader> reader) {
+                RefCountedAutoCloseable<ImageReader> reader, TCPServerThread server) {
             mImage = image;
             mFile = file;
             mCaptureResult = result;
             mCharacteristics = characteristics;
             mContext = context;
             mReader = reader;
+            tcpServer = server;
         }
 
         @Override
         public void run() {
             boolean success = false;
             int format = mImage.getFormat();
+            int height = mImage.getHeight();
+            int width = mImage.getWidth();
+            int size = 2* width * height;
+
+            Log.e("RV.............", "image size: " + size);
+
             switch(format) {
                 case ImageFormat.JPEG: {
                     ByteBuffer buffer = mImage.getPlanes()[0].getBuffer();
@@ -1267,8 +1297,45 @@ public class Camera2RawFragment extends Fragment implements View.OnClickListener
                     DngCreator dngCreator = new DngCreator(mCharacteristics, mCaptureResult);
                     FileOutputStream output = null;
                     try {
+                        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
                         output = new FileOutputStream(mFile);
-                        dngCreator.writeImage(output, mImage);
+
+
+                       // tcpServer.sendSnapshotResponse(4, outputStream);
+                        //dngCreator.writeImage(output, mImage);
+                        tcpServer.constructHeader(4, size);
+                        dngCreator.writeImage(tcpServer.streamOut, mImage);
+
+
+/*
+                        Deque<Byte> sendBuffer = new ArrayDeque<Byte>(10);
+
+                        byte idByteArr[] = BigInteger.valueOf(4).toByteArray();
+                        tcpServer.streamOut.write(idByteArr, 0, idByteArr.length);
+
+
+                        for (int i = 0; i < 4 - idByteArr.length; ++i) {
+                            sendBuffer.push((byte)0);
+                        }
+
+                        byte lengthByteArr[] = BigInteger.valueOf().toByteArray();
+                        tcpServer.streamOut.write(lengthByteArr, 0, lengthByteArr.length);
+                        //Log.e("RV...", "lengthByteArr " + lengthByteArr.length);
+
+                        for (int i = 0; i < 4 - lengthByteArr.length; ++i) {
+                            sendBuffer.push((byte) 0);
+                        }
+
+                        for (int i = 0; i < lengthByteArr.length; ++i) {
+                            sendBuffer.push(lengthByteArr[i]);
+                        }
+
+*/
+
+
+                        // tcpServer.sendResponse(outputStream, 4, outputStream.toByteArray().length);
+                        //tcpServer.sendSnapshotResponse(4, outputStream.toByteArray());
+
                         success = true;
                     } catch (IOException e) {
                         e.printStackTrace();
@@ -1365,7 +1432,7 @@ public class Camera2RawFragment extends Fragment implements View.OnClickListener
                     return null;
                 }
                 return new ImageSaver(mImage, mFile, mCaptureResult, mCharacteristics, mContext,
-                        mReader);
+                        mReader, testServer);
             }
 
             public synchronized String getSaveLocation() {
@@ -1670,5 +1737,322 @@ public class Camera2RawFragment extends Fragment implements View.OnClickListener
     }
 
     // *********************************************************************************************
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    private  class TCPServerThread implements Runnable {
+
+
+        private static final int MAX_AVAILABLE = 2;
+        private final Semaphore available = new Semaphore(MAX_AVAILABLE, true);
+
+        public static final int SERVER_PORT = 1456;
+        private ServerSocket server;
+        private Socket socket;
+
+        private boolean isSendingDataReady = false;
+        private BufferedReader streamIn;
+        public DataInputStream streamIn_new;
+        public DataOutputStream streamOut;
+
+        private Deque<Byte> receiveBuffer = new ArrayDeque<Byte>(256);
+        private Deque<Byte> sendBuffer = new ArrayDeque<Byte>(256);
+
+        private boolean isReceivingPayload = false;
+        private int payloadId = 0;
+        private int payloadSize = 0;
+
+        public static final int HEADER_SIZE = 4;
+
+        private void sendEchoBack(int id) {
+            byte[] sendBuf = {'P', 'I', 'N', 'G', ' ', 'A', 'C', 'K'};
+            sendResponse(sendBuf, id + 1, sendBuf.length);
+        }
+
+        public void sendSnapshotResponse(int id, byte[] sendBuf) {
+            Log.e("RV...", "id: " + id);
+            Log.e("RV...", "length: " + sendBuf.length);
+            //Log.e("RV...", sendBuf.toString());
+            sendResponse(sendBuf, id, sendBuf.length);
+        }
+
+        private void sendSnapshotResponse(int id) {
+            byte[] sendBuf = {1, 2, 3, 4, 5, 6};
+            sendResponse(sendBuf, id + 1, sendBuf.length);
+        }
+
+
+
+
+
+
+        public void constructHeader(int id, int length) {
+            try {
+                available.acquire();
+
+                byte idByteArr[] = BigInteger.valueOf(id).toByteArray();
+                for (int i = 0; i < 4 - idByteArr.length; ++i) {
+                    sendBuffer.push((byte) 0);
+                }
+
+                for (int i = 0; i < idByteArr.length; ++i) {
+                    sendBuffer.push(idByteArr[i]);
+                }
+
+                byte lengthByteArr[] = BigInteger.valueOf(length).toByteArray();
+                //Log.e("RV...", "lengthByteArr " + lengthByteArr.length);
+
+                for (int i = 0; i < 4 - lengthByteArr.length; ++i) {
+                    sendBuffer.push((byte) 0);
+                }
+
+                for (int i = 0; i < lengthByteArr.length; ++i) {
+                    sendBuffer.push(lengthByteArr[i]);
+                }
+                isSendingDataReady = true;
+                Log.e("RV...", "I am here 2");
+                isProcessingPacket = false;
+                available.release();
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
+
+
+
+
+
+
+
+
+
+
+
+
+        private void sendResponse(byte[] sendBuf, int id, int length) {
+            try {
+                available.acquire();
+                for (int i = 0; i < sendBuf.length; ++i) {
+                    sendBuffer.push(sendBuf[length - i - 1]);
+                }
+
+                byte idByteArr[] = BigInteger.valueOf(id).toByteArray();
+                for (int i = 0; i < 4 - idByteArr.length; ++i) {
+                    sendBuffer.push((byte) 0);
+                }
+
+                for (int i = 0; i < idByteArr.length; ++i) {
+                    sendBuffer.push(idByteArr[i]);
+                }
+
+                byte lengthByteArr[] = BigInteger.valueOf(length).toByteArray();
+                //Log.e("RV...", "lengthByteArr " + lengthByteArr.length);
+
+                for (int i = 0; i < 4 - lengthByteArr.length; ++i) {
+                    sendBuffer.push((byte) 0);
+                }
+
+                for (int i = 0; i < lengthByteArr.length; ++i) {
+                    sendBuffer.push(lengthByteArr[i]);
+                }
+                isSendingDataReady = true;
+                Log.e("RV...", "I am here 2");
+                isProcessingPacket = false;
+                available.release();
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
+
+        public void parseReceivedPacket() {
+
+            Log.e("RV...", "REceivingPayload: " + isReceivingPayload);
+            Log.e("RV...", "REceivingzie: " + receiveBuffer.size());
+
+            if (isReceivingPayload == false) {
+                if (receiveBuffer.size() >= 2 * HEADER_SIZE) {
+                    Log.e("RV...", "REceivingPayload: " + isReceivingPayload);
+                    byte[] length = new byte[HEADER_SIZE];
+                    for (int i = 0; i < HEADER_SIZE; i++) {
+                        length[i] = receiveBuffer.pop();
+                    }
+                    ByteBuffer buffer = ByteBuffer.wrap(length);
+                    buffer.order(ByteOrder.BIG_ENDIAN);
+                    payloadSize = buffer.getInt();
+
+                    byte[] length1 = new byte[HEADER_SIZE];
+                    for (int i = 0; i < HEADER_SIZE; i++) {
+                        length1[i] = receiveBuffer.pop();
+                    }
+                    ByteBuffer buffer1 = ByteBuffer.wrap(length1);
+                    buffer1.order(ByteOrder.BIG_ENDIAN);
+                    payloadId = buffer1.getInt();
+
+                    Log.e("RVNEW...", "...............Payload Size: " + payloadSize);
+                    Log.e("RVNEW...", "...............Payload id: " + payloadId);
+                    isReceivingPayload = true;
+                }
+            }
+
+            if (isReceivingPayload == true) {
+                if (receiveBuffer.size() >= payloadSize) {
+                    byte[] payload = new byte[payloadSize];
+                    for (int i = 0; i < payloadSize; i++) {
+                        payload[payloadSize - i - 1] = receiveBuffer.pop();
+                    }
+                    isProcessingPacket = true;
+                    if (payloadId == 1) {
+                        Log.e("RV....", "Responding to ping");
+                        sendEchoBack(payloadId);
+                    } else if (payloadId == 3) {
+                        Log.e("RV....", "responding to takePicture request");
+                        takePicture();
+                        //sendSnapshotResponse(payloadId);
+                    }
+                }
+                isReceivingPayload = false;
+            }
+        }
+
+        public void run() {
+            try {
+                boolean done = false;
+
+                openSocket();
+                openStream();
+
+                while (done == false) {
+                    try {
+                        byte[] line = new byte[256];
+                        if (streamIn_new.available() > 0) {
+                            int readData = streamIn_new.read(line, 0, 256);
+
+                            Log.e("RV....", "inside run loop2");
+
+                            if (readData > 0) {
+                                for (int i = 0; i < readData; ++i) {
+                                    receiveBuffer.push(line[i]);
+                                }
+                                Log.e("RV....:", "received data: " + receiveBuffer.toString());
+                            }
+                            //Log.e("RV....", "inside loop");
+                            Log.e("RV....", "inside run loop3");
+                            Log.e("RV...", "RxBufSize: " + receiveBuffer.size());
+                            Log.e("RV...", "IsProcessing: : " + isProcessingPacket);
+                        }
+                        while (isProcessingPacket == false && receiveBuffer.size() >= 8) {
+                            Log.e("RV...", "consumeBufSize: " + receiveBuffer.size());
+                            parseReceivedPacket();
+                        }
+
+                        try {
+                            available.acquire();
+                            if (isSendingDataReady == true) {
+                                Log.e("RV...", "I am here 3");
+                                if (sendBuffer.isEmpty() != true) {
+                                    Log.e("RV...", "I am here 4");
+                                    //Log.e("RV...", "in sendBuffer: " + sendBuffer.size());
+                                    int sendSize = sendBuffer.size();
+                                    byte[] sendBuf = new byte[sendSize];
+
+                                    for (int i = 0; i < sendSize; ++i) {
+                                        sendBuf[i] = sendBuffer.pop();
+                                    }
+                                    streamOut.write(sendBuf, 0, sendSize);
+                                    Log.e("RV...", "sent data: " + sendSize);
+
+                                }
+                                isSendingDataReady = false;
+                            }
+                            available.release();
+                        } catch (InterruptedException e) {
+                            e.printStackTrace();
+                        }
+                    } catch (IOException ioe) {
+                        Log.e("RV..EXCEPT.....", ioe.getLocalizedMessage());
+                        done = true;
+                    }
+                }
+                closeStream();
+            } catch (IOException ioe) {
+                Log.e("RV..EXCEPT.....", ioe.getLocalizedMessage());
+            } finally {
+                try {
+                    closeStream();
+                    closeSocket();
+                } catch (IOException ioe) {
+                    Log.e("RV..EXCEPT.....", ioe.getLocalizedMessage());
+                }
+            }
+        }
+
+        private void openSocket() throws IOException {
+            System.out.println("Binding to port " + SERVER_PORT + ", please wait  ...");
+            server = new ServerSocket(SERVER_PORT);
+            Log.e("RV..............", "Server started: " + server);
+
+            Log.e("RV............", "Waiting for a client ...");
+            socket = server.accept();
+            Log.e("RV............", ("Client accepted: " + socket));
+        }
+
+        private void openStream() throws IOException {
+            //streamIn = new DataInputStream(new BufferedInputStream(socket.getInputStream()));
+            streamIn = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+            streamOut = new DataOutputStream(socket.getOutputStream());
+            streamIn_new = new DataInputStream(socket.getInputStream());
+        }
+
+        private void closeSocket() throws IOException {
+            if (socket != null)
+                socket.close();
+        }
+
+        private void closeStream() throws IOException {
+            if (streamIn != null)
+                streamIn.close();
+            if (streamIn_new != null)
+                streamIn_new.close();
+
+            if (streamOut != null)
+                streamOut.close();
+        }
+
+
+    }
 
 }
