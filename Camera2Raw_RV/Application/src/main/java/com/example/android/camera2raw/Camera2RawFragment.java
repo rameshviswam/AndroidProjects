@@ -263,11 +263,12 @@ public class Camera2RawFragment extends Fragment implements View.OnClickListener
 
     private int AF_Mode = -1;
 
+    private int camera_mode = 1;
     private float focus_distance = -1f;
     private long exposure_time = 0;
     private int exposure_gain = 0;
-
     private long frame_duration = 0;
+
     /**
      * A {@link CameraCaptureSession } for camera preview.
      */
@@ -914,8 +915,8 @@ public class Camera2RawFragment extends Fragment implements View.OnClickListener
      */
     private void setup3AControlsLocked(CaptureRequest.Builder builder) {
         // Enable auto-magical 3A run by camera device
-        builder.set(CaptureRequest.CONTROL_MODE,
-                CaptureRequest.CONTROL_MODE_AUTO);
+        builder.set(CaptureRequest.CONTROL_MODE, camera_mode);
+                //CaptureRequest.CONTROL_MODE_AUTO);
 
         Float minFocusDist =
                 mCharacteristics.get(CameraCharacteristics.LENS_INFO_MINIMUM_FOCUS_DISTANCE);
@@ -937,66 +938,60 @@ public class Camera2RawFragment extends Fragment implements View.OnClickListener
         Log.e("RV2NEW...", ".......Payload val1: " + Control_Mode);
         Log.e("RV2NEW...", ".......Payload val2: " + AF_Mode);
 
-        if (!mNoAFRun) {
-            // If there is a "continuous picture" mode available, use it, otherwise default to AUTO.
-            if (contains(mCharacteristics.get(
-                            CameraCharacteristics.CONTROL_AF_AVAILABLE_MODES),
-                    CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE)) {
-                builder.set(CaptureRequest.CONTROL_AF_MODE,
-                        CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE);
-            } else {
-                builder.set(CaptureRequest.CONTROL_AF_MODE,
-                        CaptureRequest.CONTROL_AF_MODE_AUTO);
+        if(camera_mode == 1) {
+            if (!mNoAFRun) {
+                // If there is a "continuous picture" mode available, use it, otherwise default to AUTO.
+                if (contains(mCharacteristics.get(
+                                CameraCharacteristics.CONTROL_AF_AVAILABLE_MODES),
+                        CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE)) {
+                    builder.set(CaptureRequest.CONTROL_AF_MODE,
+                            CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE);
+                } else {
+                    builder.set(CaptureRequest.CONTROL_AF_MODE,
+                            CaptureRequest.CONTROL_AF_MODE_AUTO);
+                }
             }
-        }
 
-        // If there is an auto-magical flash control mode available, use it, otherwise default to
-        // the "on" mode, which is guaranteed to always be available.
-        if (contains(mCharacteristics.get(
-                        CameraCharacteristics.CONTROL_AE_AVAILABLE_MODES),
-                CaptureRequest.CONTROL_AE_MODE_ON_AUTO_FLASH)) {
-            builder.set(CaptureRequest.CONTROL_AE_MODE,
-                    CaptureRequest.CONTROL_AE_MODE_ON_AUTO_FLASH);
+            // If there is an auto-magical flash control mode available, use it, otherwise default to
+            // the "on" mode, which is guaranteed to always be available.
+            if (contains(mCharacteristics.get(
+                            CameraCharacteristics.CONTROL_AE_AVAILABLE_MODES),
+                    CaptureRequest.CONTROL_AE_MODE_ON_AUTO_FLASH)) {
+                builder.set(CaptureRequest.CONTROL_AE_MODE,
+                        CaptureRequest.CONTROL_AE_MODE_ON_AUTO_FLASH);
+            } else {
+                builder.set(CaptureRequest.CONTROL_AE_MODE,
+                        CaptureRequest.CONTROL_AE_MODE_ON);
+            }
+
+
+            // If there is an auto-magical white balance control mode available, use it.
+            if (contains(mCharacteristics.get(
+                            CameraCharacteristics.CONTROL_AWB_AVAILABLE_MODES),
+                    CaptureRequest.CONTROL_AWB_MODE_AUTO)) {
+                // Allow AWB to run auto-magically if this device supports this
+                builder.set(CaptureRequest.CONTROL_AWB_MODE,
+                        CaptureRequest.CONTROL_AWB_MODE_AUTO);
+            }
         } else {
+            Log.e("RV...",".......................MANUAL Setting");
+            builder.set(CaptureRequest.CONTROL_AF_MODE,
+                    CaptureRequest.CONTROL_AF_MODE_OFF);
+
+            builder.set(CaptureRequest.LENS_FOCUS_DISTANCE, focus_distance);
+
             builder.set(CaptureRequest.CONTROL_AE_MODE,
-                    CaptureRequest.CONTROL_AE_MODE_ON);
-        }
+                    CaptureRequest.CONTROL_AE_MODE_OFF);
 
+            builder.set(CaptureRequest.SENSOR_EXPOSURE_TIME, exposure_time);
 
-        // If there is an auto-magical white balance control mode available, use it.
-        if (contains(mCharacteristics.get(
-                        CameraCharacteristics.CONTROL_AWB_AVAILABLE_MODES),
-                CaptureRequest.CONTROL_AWB_MODE_AUTO)) {
-            // Allow AWB to run auto-magically if this device supports this
+            builder.set(CaptureRequest.SENSOR_SENSITIVITY, exposure_gain);
+
+            builder.set(CaptureRequest.SENSOR_FRAME_DURATION, frame_duration);
+
             builder.set(CaptureRequest.CONTROL_AWB_MODE,
-                    CaptureRequest.CONTROL_AWB_MODE_AUTO);
+                    CaptureRequest.CONTROL_AWB_MODE_OFF);
         }
-
-
-        builder.set(CaptureRequest.CONTROL_AF_MODE,
-                CaptureRequest.CONTROL_AF_MODE_OFF);
-
-        // builder.set(CaptureRequest.SENSOR_EXPOSURE_TIME, 1L);
-
-
-        builder.set(CaptureRequest.CONTROL_AF_MODE,
-                CaptureRequest.CONTROL_AF_MODE_OFF);
-
-        builder.set(CaptureRequest.LENS_FOCUS_DISTANCE, focus_distance);
-
-        builder.set(CaptureRequest.CONTROL_AE_MODE,
-                CaptureRequest.CONTROL_AE_MODE_OFF);
-
-        builder.set(CaptureRequest.SENSOR_EXPOSURE_TIME, exposure_time);
-
-        builder.set(CaptureRequest.SENSOR_SENSITIVITY, exposure_gain);
-
-
-        builder.set(CaptureRequest.SENSOR_FRAME_DURATION, frame_duration);
-
-        builder.set(CaptureRequest.CONTROL_AWB_MODE,
-                CaptureRequest.CONTROL_AWB_MODE_OFF);
-
     }
 
     /**
@@ -1894,31 +1889,36 @@ public class Camera2RawFragment extends Fragment implements View.OnClickListener
         public void parseReceivedPacket() {
             if (isReceivingPayload == false) {
                 if (receiveBuffer.size() >= 2 * HEADER_SIZE) {
-                    Log.e("RV...", "REceivingPayload: " + isReceivingPayload);
+                    Log.e("RV3...", "REceivingPayload: " + isReceivingPayload);
                     byte[] length =  new byte[HEADER_SIZE];
+                    Log.e("MKRV...", "ReceiveQueue before pop: " + receiveBuffer.toString());
                     for (int i = 0; i < HEADER_SIZE; i++) {
-                        length[i] = receiveBuffer.pop();
+                        length[i] = receiveBuffer.removeFirst();
                     }
+                    Log.e("MKRV...", "ReceiveQueue after pop: " + receiveBuffer.toString());
 
-                    Log.e("RV....:", "length data: " + length.toString());
+                    Log.e("MKRV....:", "length data: " + length.toString());
 
                     ByteBuffer buffer = ByteBuffer.wrap(length);
                     buffer.order(ByteOrder.BIG_ENDIAN);
                     payloadSize = buffer.getInt();
 
                     byte[] length1 = new byte[HEADER_SIZE];
+                    Log.e("MKRV...", "ReceiveQueue before pop: " + receiveBuffer.toString());
                     for (int i = 0; i < HEADER_SIZE; i++) {
-                        length1[i] = receiveBuffer.pop();
+                        length1[i] = receiveBuffer.removeFirst();
                     }
+                    Log.e("MKRV...", "ReceiveQueue after pop: " + receiveBuffer.toString());
 
-                    Log.e("RV....:", "payid data: " + length.toString());
+                    Log.e("MKRV....:", "payid data: " + length.toString());
 
                     ByteBuffer buffer1 = ByteBuffer.wrap(length1);
                     buffer1.order(ByteOrder.BIG_ENDIAN);
                     payloadId = buffer1.getInt();
+                    Log.e("RV3....:", "PAYLOAD_ID: " + Integer.toString(payloadId));
 
-                    Log.e("RVNEW...", "...............Payload Size: " + payloadSize);
-                    Log.e("RVNEW...", "...............Payload id: " + payloadId);
+                    Log.e("MKRV.........", "...............Payload Size: " + payloadSize);
+                    Log.e("MKRV.........", "...............Payload id: " + payloadId);
                     isReceivingPayload = true;
                 }
             }
@@ -1928,37 +1928,41 @@ public class Camera2RawFragment extends Fragment implements View.OnClickListener
 
                 if (receiveBuffer.size() >= payloadSize) {
                     byte[] payload = new byte[payloadSize];
+                    Log.e("MKRV...", "ReceiveQueue before pop: " + receiveBuffer.toString());
                     for (int i = 0; i < payloadSize; i++) {
-                        payload[payloadSize - i - 1] = receiveBuffer.pop();
+                        payload[payloadSize - i - 1] = receiveBuffer.removeFirst();
                     }
+                    Log.e("MKRV........", "ReceiveQueue after pop: " + receiveBuffer.toString());
                     isProcessingPacket = true;
+
                     if (payloadId == 1) {
-                        Log.e("RVNEW...", ".......Payload info: " + new String(payload));
+                        Log.e("MKRV...", ".......Payload info: " + new String(payload));
                         sendEchoBack(payloadId);
                     } else if (payloadId == 3) {
-                        Log.e("RVNEW...", ".......Payload info: " + new String(payload));
+                        Log.e("RVNEW.......", ".......Payload info: " + new String(payload));
                         Log.e("RV....", "responding to takePicture request");
                         String[] requestArgs = (new String(payload)).split(";");
                         Log.e("RV3....................", "##reqeustArgs" + focus_distance);
 
-                        String field1 = requestArgs[0].split(":")[0];
-                        String val1 = requestArgs[0].split(":")[1];
+                        String field0 = requestArgs[0].split(":")[0];
+                        String val0 = requestArgs[0].split(":")[1];
 
-                        String field2 = requestArgs[1].split(":")[0];
-                        String val2 = requestArgs[1].split(":")[1];
+                        String field1 = requestArgs[1].split(":")[0];
+                        String val1 = requestArgs[1].split(":")[1];
 
-                        String field3 = requestArgs[2].split(":")[0];
-                        String val3 = requestArgs[2].split(":")[1];
+                        String field2 = requestArgs[2].split(":")[0];
+                        String val2 = requestArgs[2].split(":")[1];
 
-                        String field4 = requestArgs[3].split(":")[0];
-                        String val4 = requestArgs[3].split(":")[1];
+                        String field3 = requestArgs[3].split(":")[0];
+                        String val3 = requestArgs[3].split(":")[1];
 
-                        focus_distance = Float.parseFloat(val3);
+                        String field4 = requestArgs[4].split(":")[0];
+                        String val4 = requestArgs[4].split(":")[1];
 
-                        exposure_time = Long.parseLong(val2);
-
+                        camera_mode = Integer.parseInt(val0);
                         exposure_gain = Integer.parseInt(val1);
-
+                        exposure_time = Long.parseLong(val2);
+                        focus_distance = Float.parseFloat(val3);
                         frame_duration = Long.parseLong(val4);
 
                         Log.e("RV3....................", "##focus_distance" + focus_distance);
@@ -1993,19 +1997,17 @@ public class Camera2RawFragment extends Fragment implements View.OnClickListener
                         if (streamIn_new.available() > 0) {
                             int readData = streamIn_new.read(line, 0, 256);
 
-                            Log.e("RV....", "inside run looFp2");
-
                             if (readData > 0) {
+                                Log.e("MKRV....", "----------------------------------------");
                                 for (int i = 0; i < readData; ++i) {
                                     receiveBuffer.push(line[i]);
                                 }
-                                Log.e("RV....:", "received data: " + receiveBuffer.toString());
+                                Log.e("MKRV....:", "received data: " + receiveBuffer.toString());
                             }
-                            //Log.e("RV....", "inside loop");
-                            Log.e("RV....", "inside run loop3");
-                            Log.e("RV...", "RxBufSize: " + receiveBuffer.size());
+                            Log.e("MRKV...", "RxBufSize: " + receiveBuffer.size());
                             Log.e("RV...", "IsProcessing: : " + isProcessingPacket);
                         }
+
                         if (!receiveBuffer.isEmpty()) {
                             // Log.e("RV...", "consumeBufSize: " + receiveBuffer.size());
                             parseReceivedPacket();
