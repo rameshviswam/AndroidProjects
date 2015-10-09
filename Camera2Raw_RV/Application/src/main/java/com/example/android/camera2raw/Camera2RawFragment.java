@@ -70,9 +70,7 @@ import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.InputStreamReader;
 import java.io.OutputStream;
-import java.math.BigInteger;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.ByteBuffer;
@@ -95,7 +93,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * A fragment that demonstrates use of the Camera2 API to capture RAW and JPEG photos.
- * <p/>
+ *
  * In this example, the lifecycle of a single request to take a photo is:
  * <ul>
  * <li>
@@ -128,8 +126,6 @@ public class Camera2RawFragment extends Fragment implements View.OnClickListener
 
     static private TCPServerThread testServer;
     private Thread mServerThread;
-
-    private boolean isProcessingPacket = false;
 
     /**
      * Conversion from screen rotation to JPEG orientation.
@@ -185,7 +181,6 @@ public class Camera2RawFragment extends Fragment implements View.OnClickListener
      * but the orientation of the has changed, and thus the preview rotation must be updated.
      */
     private OrientationEventListener mOrientationListener;
-
 
     static private Deque<byte[]> picArray = new ArrayDeque<byte[]>(10);
 
@@ -383,7 +378,7 @@ public class Camera2RawFragment extends Fragment implements View.OnClickListener
         @Override
         public void onError(CameraDevice cameraDevice, int error) {
             Log.e(TAG, "Received camera device error: " + error);
-            synchronized (mCameraStateLock) {
+            synchronized(mCameraStateLock) {
                 mState = STATE_CLOSED;
                 mCameraOpenCloseLock.release();
                 cameraDevice.close();
@@ -433,7 +428,7 @@ public class Camera2RawFragment extends Fragment implements View.OnClickListener
             = new CameraCaptureSession.CaptureCallback() {
 
         private void process(CaptureResult result) {
-            synchronized (mCameraStateLock) {
+            synchronized(mCameraStateLock) {
                 switch (mState) {
                     case STATE_PREVIEW: {
                         // We have nothing to do when the camera preview is running normally.
@@ -447,7 +442,7 @@ public class Camera2RawFragment extends Fragment implements View.OnClickListener
                             // If auto-focus has reached locked state, we are ready to capture
                             readyToCapture =
                                     (afState == CaptureResult.CONTROL_AF_STATE_FOCUSED_LOCKED ||
-                                            afState == CaptureResult.CONTROL_AF_STATE_NOT_FOCUSED_LOCKED);
+                                    afState == CaptureResult.CONTROL_AF_STATE_NOT_FOCUSED_LOCKED);
                         }
 
                         // If we are running on an non-legacy device, we should also wait until
@@ -570,9 +565,6 @@ public class Camera2RawFragment extends Fragment implements View.OnClickListener
                 mJpegResultQueue.remove(requestId);
                 mRawResultQueue.remove(requestId);
                 finishedCaptureLocked();
-                Log.e("RV.....", "DONE WITH PACKET.....................");
-                isProcessingPacket = false;
-
             }
             showToast("Capture failed!");
         }
@@ -695,7 +687,7 @@ public class Camera2RawFragment extends Fragment implements View.OnClickListener
                 Log.e("RV..........", "camID" + cameraId);
                 // We only use a camera that supports RAW in this sample.
                 if (!contains(characteristics.get(
-                                CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES),
+                        CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES),
                         CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES_RAW)) {
                     continue;
                 }
@@ -714,14 +706,14 @@ public class Camera2RawFragment extends Fragment implements View.OnClickListener
 
                 Log.e("RV", "size: " + largestRaw.getHeight() + " " + largestRaw.getWidth());
 
-                synchronized (mCameraStateLock) {
+                synchronized(mCameraStateLock) {
                     // Set up ImageReaders for JPEG and RAW outputs.  Place these in a reference
                     // counted wrapper to ensure they are only closed when all background tasks
                     // using them are finished.
                     if (mJpegImageReader == null || mJpegImageReader.getAndRetain() == null) {
                         mJpegImageReader = new RefCountedAutoCloseable<>(
                                 ImageReader.newInstance(largestJpeg.getWidth(),
-                                        largestJpeg.getHeight(), ImageFormat.JPEG, /*maxImages*/5));
+                                largestJpeg.getHeight(), ImageFormat.JPEG, /*maxImages*/5));
                     }
                     mJpegImageReader.get().setOnImageAvailableListener(
                             mOnJpegImageAvailableListener, mBackgroundHandler);
@@ -729,7 +721,7 @@ public class Camera2RawFragment extends Fragment implements View.OnClickListener
                     if (mRawImageReader == null || mRawImageReader.getAndRetain() == null) {
                         mRawImageReader = new RefCountedAutoCloseable<>(
                                 ImageReader.newInstance(largestRaw.getWidth(),
-                                        largestRaw.getHeight(), ImageFormat.RAW_SENSOR, /*maxImages*/ 5));
+                                largestRaw.getHeight(), ImageFormat.RAW_SENSOR, /*maxImages*/ 5));
                     }
                     mRawImageReader.get().setOnImageAvailableListener(
                             mOnRawImageAvailableListener, mBackgroundHandler);
@@ -789,7 +781,7 @@ public class Camera2RawFragment extends Fragment implements View.OnClickListener
     private void closeCamera() {
         try {
             mCameraOpenCloseLock.acquire();
-            synchronized (mCameraStateLock) {
+            synchronized(mCameraStateLock) {
 
                 // Reset state and clean up resources used by the camera.
                 // Note: After calling this, the ImageReaders will be closed after any background
@@ -826,7 +818,7 @@ public class Camera2RawFragment extends Fragment implements View.OnClickListener
     private void startBackgroundThread() {
         mBackgroundThread = new HandlerThread("CameraBackground");
         mBackgroundThread.start();
-        synchronized (mCameraStateLock) {
+        synchronized(mCameraStateLock) {
             mBackgroundHandler = new Handler(mBackgroundThread.getLooper());
         }
     }
@@ -849,7 +841,7 @@ public class Camera2RawFragment extends Fragment implements View.OnClickListener
 
     /**
      * Creates a new {@link CameraCaptureSession} for camera preview.
-     * <p/>
+     *
      * Call this only with {@link #mCameraStateLock} held.
      */
     private void createCameraPreviewSessionLocked() {
@@ -868,8 +860,8 @@ public class Camera2RawFragment extends Fragment implements View.OnClickListener
 
             // Here, we create a CameraCaptureSession for camera preview.
             mCameraDevice.createCaptureSession(Arrays.asList(surface,
-                            mJpegImageReader.get().getSurface(),
-                            mRawImageReader.get().getSurface()), new CameraCaptureSession.StateCallback() {
+                    mJpegImageReader.get().getSurface(),
+                    mRawImageReader.get().getSurface()), new CameraCaptureSession.StateCallback() {
                         @Override
                         public void onConfigured(CameraCaptureSession cameraCaptureSession) {
                             synchronized (mCameraStateLock) {
@@ -885,7 +877,7 @@ public class Camera2RawFragment extends Fragment implements View.OnClickListener
                                             mPreviewRequestBuilder.build(),
                                             mPreCaptureCallback, mBackgroundHandler);
                                     mState = STATE_PREVIEW;
-                                } catch (CameraAccessException | IllegalStateException e) {
+                                } catch (CameraAccessException|IllegalStateException e) {
                                     e.printStackTrace();
                                     return;
                                 }
@@ -908,7 +900,7 @@ public class Camera2RawFragment extends Fragment implements View.OnClickListener
     /**
      * Configure the given {@link CaptureRequest.Builder} to use auto-focus, auto-exposure, and
      * auto-white-balance controls if available.
-     * <p/>
+     *
      * Call this only with {@link #mCameraStateLock} held.
      *
      * @param builder the builder to configure.
@@ -916,14 +908,14 @@ public class Camera2RawFragment extends Fragment implements View.OnClickListener
     private void setup3AControlsLocked(CaptureRequest.Builder builder) {
         // Enable auto-magical 3A run by camera device
         builder.set(CaptureRequest.CONTROL_MODE, camera_mode);
-                //CaptureRequest.CONTROL_MODE_AUTO);
+        //CaptureRequest.CONTROL_MODE_AUTO);
 
         Float minFocusDist =
                 mCharacteristics.get(CameraCharacteristics.LENS_INFO_MINIMUM_FOCUS_DISTANCE);
 
         Log.e("RV3...", "focus dist: " + minFocusDist);
 
-        android.util.Range exposure_range =  mCharacteristics.get(CameraCharacteristics.SENSOR_INFO_EXPOSURE_TIME_RANGE);
+        android.util.Range exposure_range = mCharacteristics.get(CameraCharacteristics.SENSOR_INFO_EXPOSURE_TIME_RANGE);
         Log.e("RV3...", "exposure_range: " + exposure_range);
 
         android.util.Range sensitivity_range = mCharacteristics.get(CameraCharacteristics.SENSOR_INFO_SENSITIVITY_RANGE);
@@ -938,7 +930,7 @@ public class Camera2RawFragment extends Fragment implements View.OnClickListener
         Log.e("RV2NEW...", ".......Payload val1: " + Control_Mode);
         Log.e("RV2NEW...", ".......Payload val2: " + AF_Mode);
 
-        if(camera_mode == 1) {
+        if (camera_mode == 1) {
             if (!mNoAFRun) {
                 // If there is a "continuous picture" mode available, use it, otherwise default to AUTO.
                 if (contains(mCharacteristics.get(
@@ -964,7 +956,6 @@ public class Camera2RawFragment extends Fragment implements View.OnClickListener
                         CaptureRequest.CONTROL_AE_MODE_ON);
             }
 
-
             // If there is an auto-magical white balance control mode available, use it.
             if (contains(mCharacteristics.get(
                             CameraCharacteristics.CONTROL_AWB_AVAILABLE_MODES),
@@ -973,8 +964,23 @@ public class Camera2RawFragment extends Fragment implements View.OnClickListener
                 builder.set(CaptureRequest.CONTROL_AWB_MODE,
                         CaptureRequest.CONTROL_AWB_MODE_AUTO);
             }
+
+            focus_distance = builder.get(CaptureRequest.LENS_FOCUS_DISTANCE);
+
+            exposure_time = builder.get(CaptureRequest.SENSOR_EXPOSURE_TIME);
+
+            exposure_gain = builder.get(CaptureRequest.SENSOR_SENSITIVITY);
+
+            Log.e("RV AUTO...", "focus distance: " + focus_distance);
+            Log.e("RV AUTO...", "exposure_time: " + exposure_time);
+            Log.e("RV AUTO...", "exposure_gain: " + exposure_gain);
+
+            builder.set(CaptureRequest.SENSOR_FRAME_DURATION, frame_duration);
+
+
+
         } else {
-            Log.e("RV...",".......................MANUAL Setting");
+            Log.e("RV...", ".......................MANUAL Setting");
             builder.set(CaptureRequest.CONTROL_AF_MODE,
                     CaptureRequest.CONTROL_AF_MODE_OFF);
 
@@ -997,7 +1003,7 @@ public class Camera2RawFragment extends Fragment implements View.OnClickListener
     /**
      * Configure the necessary {@link android.graphics.Matrix} transformation to `mTextureView`,
      * and start/restart the preview capture session if necessary.
-     * <p/>
+     *
      * This method should be called after the camera state has been initialized in
      * setUpCameraOutputs.
      *
@@ -1006,7 +1012,7 @@ public class Camera2RawFragment extends Fragment implements View.OnClickListener
      */
     private void configureTransform(int viewWidth, int viewHeight) {
         Activity activity = getActivity();
-        synchronized (mCameraStateLock) {
+        synchronized(mCameraStateLock) {
             if (null == mTextureView || null == activity) {
                 return;
             }
@@ -1101,14 +1107,14 @@ public class Camera2RawFragment extends Fragment implements View.OnClickListener
 
     /**
      * Initiate a still image capture.
-     * <p/>
+     *
      * This function sends a capture request that initiates a pre-capture sequence in our state
      * machine that waits for auto-focus to finish, ending in a "locked" state where the lens is no
      * longer moving, waits for auto-exposure to choose a good exposure value, and waits for
      * auto-white-balance to converge.
      */
     private void takePicture() {
-        synchronized (mCameraStateLock) {
+        synchronized(mCameraStateLock) {
             mPendingUserCaptures++;
 
             // If we already triggered a pre-capture sequence, or are in a state where we cannot
@@ -1116,7 +1122,6 @@ public class Camera2RawFragment extends Fragment implements View.OnClickListener
             if (mState != STATE_PREVIEW) {
                 return;
             }
-
 
             try {
                 // Trigger an auto-focus run if camera is capable. If the camera is already focused,
@@ -1153,7 +1158,7 @@ public class Camera2RawFragment extends Fragment implements View.OnClickListener
     /**
      * Send a capture request to the camera device that initiates a capture targeting the JPEG and
      * RAW outputs.
-     * <p/>
+     *
      * Call this only with {@link #mCameraStateLock} held.
      */
     private void captureStillPictureLocked() {
@@ -1166,7 +1171,7 @@ public class Camera2RawFragment extends Fragment implements View.OnClickListener
             final CaptureRequest.Builder captureBuilder =
                     mCameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_STILL_CAPTURE);
 
-            captureBuilder.addTarget(mJpegImageReader.get().getSurface());
+            //captureBuilder.addTarget(mJpegImageReader.get().getSurface());
             captureBuilder.addTarget(mRawImageReader.get().getSurface());
 
             // Use the same AE and AF modes as the preview.
@@ -1202,7 +1207,7 @@ public class Camera2RawFragment extends Fragment implements View.OnClickListener
     /**
      * Called after a RAW/JPEG capture has completed; resets the AF trigger state for the
      * pre-capture sequence.
-     * <p/>
+     *
      * Call this only with {@link #mCameraStateLock} held.
      */
     private void finishedCaptureLocked() {
@@ -1231,8 +1236,8 @@ public class Camera2RawFragment extends Fragment implements View.OnClickListener
      * thread.
      *
      * @param pendingQueue the currently active requests.
-     * @param reader       a reference counted wrapper containing an {@link ImageReader} from which to
-     *                     acquire an image.
+     * @param reader a reference counted wrapper containing an {@link ImageReader} from which to
+     *               acquire an image.
      */
     private void dequeueAndSaveImage(TreeMap<Integer, ImageSaver.ImageSaverBuilder> pendingQueue,
                                      RefCountedAutoCloseable<ImageReader> reader) {
@@ -1270,7 +1275,7 @@ public class Camera2RawFragment extends Fragment implements View.OnClickListener
     /**
      * Runnable that saves an {@link Image} into the specified {@link File}, and updates
      * {@link android.provider.MediaStore} to include the resulting file.
-     * <p/>
+     *
      * This can be constructed through an {@link ImageSaverBuilder} as the necessary image and
      * result information becomes available.
      */
@@ -1309,8 +1314,8 @@ public class Camera2RawFragment extends Fragment implements View.OnClickListener
         private Deque<byte[]> testArr;
 
         private ImageSaver(Image image, File file, CaptureResult result,
-                           CameraCharacteristics characteristics, Context context,
-                           RefCountedAutoCloseable<ImageReader> reader, TCPServerThread server, Deque<byte[]> picArray1) {
+                CameraCharacteristics characteristics, Context context,
+                RefCountedAutoCloseable<ImageReader> reader, TCPServerThread server, Deque<byte[]> picArray1) {
             mImage = image;
             mFile = file;
             mCaptureResult = result;
@@ -1334,27 +1339,21 @@ public class Camera2RawFragment extends Fragment implements View.OnClickListener
             Log.e("RV.............", "image size: " + size);
 
             switch (format) {
-                case ImageFormat.RAW_SENSOR: {
+                case ImageFormat.RAW_SENSOR:
+                    case ImageFormat.JPEG: {
+                    ByteBuffer buffer1 = mImage.getPlanes()[0].getBuffer();
+                    byte[] bytes1 = new byte[buffer1.remaining()];
+                    buffer1.get(bytes1);
+                    Log.e("RV....", "image data: " + bytes1.length);
 
-                    try {
-                        ByteBuffer buffer1 = mImage.getPlanes()[0].getBuffer();
-                        byte[] bytes1 = new byte[buffer1.remaining()];
-                        buffer1.get(bytes1);
-                        Log.e("RV....", "image data: " + bytes1.length);
-                        tcpServer.constructHeader(4, bytes1.length);
-                        tcpServer.streamOut.write(bytes1, 0, bytes1.length);
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                    } finally {
-                        mImage.close();
-                    }
+                    tcpServer.constructHeader(bytes1.length, 4);
+                    tcpServer.constructHeaderField(bytes1);
                     break;
                 }
                 default: {
                     Log.e(TAG, "Cannot save image, unexpected image format:" + format);
                     break;
                 }
-
             }
 
             // Decrement reference count to allow ImageReader to be closed to free up resources.
@@ -1362,7 +1361,7 @@ public class Camera2RawFragment extends Fragment implements View.OnClickListener
 
             // If saving the file succeeded, update MediaStore.
             if (success) {
-                MediaScannerConnection.scanFile(mContext, new String[]{mFile.getPath()},
+                MediaScannerConnection.scanFile(mContext, new String[] { mFile.getPath()},
                 /*mimeTypes*/null, new MediaScannerConnection.MediaScannerConnectionClient() {
                     @Override
                     public void onMediaScannerConnected() {
@@ -1378,14 +1377,11 @@ public class Camera2RawFragment extends Fragment implements View.OnClickListener
             }
         }
 
-
         /**
          * Builder class for constructing {@link ImageSaver}s.
-         * <p/>
+         *
          * This class is thread safe.
          */
-
-
         public static class ImageSaverBuilder {
             private Image mImage;
             private File mFile;
@@ -1396,9 +1392,8 @@ public class Camera2RawFragment extends Fragment implements View.OnClickListener
 
             /**
              * Construct a new ImageSaverBuilder using the given {@link Context}.
-             *
              * @param context a {@link Context} to for accessing the
-             *                {@link android.provider.MediaStore}.
+             *                  {@link android.provider.MediaStore}.
              */
             public ImageSaverBuilder(final Context context) {
                 mContext = context;
@@ -1406,7 +1401,7 @@ public class Camera2RawFragment extends Fragment implements View.OnClickListener
 
             public synchronized ImageSaverBuilder setRefCountedReader(
                     RefCountedAutoCloseable<ImageReader> reader) {
-                if (reader == null) throw new NullPointerException();
+                if (reader == null ) throw new NullPointerException();
 
                 mReader = reader;
                 return this;
@@ -1429,7 +1424,6 @@ public class Camera2RawFragment extends Fragment implements View.OnClickListener
                 mCaptureResult = result;
                 return this;
             }
-
 
             public synchronized ImageSaverBuilder setCharacteristics(
                     final CameraCharacteristics characteristics) {
@@ -1518,7 +1512,6 @@ public class Camera2RawFragment extends Fragment implements View.OnClickListener
 
         /**
          * Wrap the given object.
-         *
          * @param object an object to wrap.
          */
         public RefCountedAutoCloseable(T object) {
@@ -1630,7 +1623,7 @@ public class Camera2RawFragment extends Fragment implements View.OnClickListener
      * Return true if the given array contains the given integer.
      *
      * @param modes array to check.
-     * @param mode  integer to get for.
+     * @param mode integer to get for.
      * @return true if the array contains the given integer, otherwise false.
      */
     private static boolean contains(int[] modes, int mode) {
@@ -1661,8 +1654,7 @@ public class Camera2RawFragment extends Fragment implements View.OnClickListener
     /**
      * Rotation need to transform from the camera sensor orientation to the device's current
      * orientation.
-     *
-     * @param c                 the {@link CameraCharacteristics} to query for the camera sensor orientation.
+     * @param c the {@link CameraCharacteristics} to query for the camera sensor orientation.
      * @param deviceOrientation the current device orientation relative to the native device
      *                          orientation.
      * @return the total rotation from the sensor orientation to the current device orientation.
@@ -1700,12 +1692,12 @@ public class Camera2RawFragment extends Fragment implements View.OnClickListener
      * If the given request has been completed, remove it from the queue of active requests and
      * send an {@link ImageSaver} with the results from this request to a background thread to
      * save a file.
-     * <p/>
+     *
      * Call this only with {@link #mCameraStateLock} held.
      *
      * @param requestId the ID of the {@link CaptureRequest} to handle.
-     * @param builder   the {@link ImageSaver.ImageSaverBuilder} for this request.
-     * @param queue     the queue to remove this request from, if completed.
+     * @param builder the {@link ImageSaver.ImageSaverBuilder} for this request.
+     * @param queue the queue to remove this request from, if completed.
      */
     private void handleCompletionLocked(int requestId, ImageSaver.ImageSaverBuilder builder,
                                         TreeMap<Integer, ImageSaver.ImageSaverBuilder> queue) {
@@ -1719,7 +1711,7 @@ public class Camera2RawFragment extends Fragment implements View.OnClickListener
 
     /**
      * Check if we are using a device that only supports the LEGACY hardware level.
-     * <p/>
+     *
      * Call this only with {@link #mCameraStateLock} held.
      *
      * @return true if this is a legacy device.
@@ -1731,7 +1723,7 @@ public class Camera2RawFragment extends Fragment implements View.OnClickListener
 
     /**
      * Start the timer for the pre-capture sequence.
-     * <p/>
+     *
      * Call this only with {@link #mCameraStateLock} held.
      */
     private void startTimerLocked() {
@@ -1740,7 +1732,7 @@ public class Camera2RawFragment extends Fragment implements View.OnClickListener
 
     /**
      * Check if the timer for the pre-capture sequence has been hit.
-     * <p/>
+     *
      * Call this only with {@link #mCameraStateLock} held.
      *
      * @return true if the timeout occurred.
@@ -1750,10 +1742,7 @@ public class Camera2RawFragment extends Fragment implements View.OnClickListener
     }
 
     // *********************************************************************************************
-
-
     private class TCPServerThread implements Runnable {
-
 
         private static final int MAX_AVAILABLE = 2;
         private final Semaphore available = new Semaphore(MAX_AVAILABLE, true);
@@ -1762,8 +1751,6 @@ public class Camera2RawFragment extends Fragment implements View.OnClickListener
         private ServerSocket server;
         private Socket socket;
 
-        private boolean isSendingDataReady = false;
-        private BufferedReader streamIn;
         public DataInputStream streamIn_new;
         public DataOutputStream streamOut;
 
@@ -1774,148 +1761,84 @@ public class Camera2RawFragment extends Fragment implements View.OnClickListener
         private int payloadId = 0;
         private int payloadSize = 0;
 
-        public static final int HEADER_SIZE = 4;
-
-        private void sendEchoBack(int id) {
-            byte[] sendBuf = {'P', 'I', 'N', 'G', ' ', 'A', 'C', 'K'};
-            sendResponse(sendBuf, id + 1, sendBuf.length);
-        }
-
-        public void sendSnapshotResponse(int id, byte[] sendBuf) {
-            Log.e("RV...", "id: " + id);
-            Log.e("RV...", "length: " + sendBuf.length);
-            //Log.e("RV...", sendBuf.toString());
-            sendResponse(sendBuf, id, sendBuf.length);
-        }
-
-        private void sendSnapshotResponse(int id) {
-            byte[] sendBuf = {1, 2, 3, 4, 5, 6};
-            sendResponse(sendBuf, id + 1, sendBuf.length);
-        }
-
-
-        public void constructHeader(int id, int length) {
-            try {
-                // available.acquire();
-
-                byte[] sendBuf = new byte[8];
-                int CurPost = 0;
-                int i = 0;
-                byte idByteArr[] = BigInteger.valueOf(id).toByteArray();
-                for (i = 0; i < 4 - idByteArr.length; ++i) {
-                    sendBuffer.push((byte) 0);
-                    sendBuf[7 - CurPost] = (byte) 0;
-                    CurPost++;
-                }
-
-                Log.e("RVNEW.....", "curPost: " + CurPost);
-
-                for (i = 0; i < idByteArr.length; ++i) {
-                    sendBuffer.push(idByteArr[i]);
-                    sendBuf[7 - CurPost] = idByteArr[i];
-                    CurPost++;
-                }
-
-                Log.e("RVNEW.....", "curPost: " + CurPost);
-
-                byte lengthByteArr[] = BigInteger.valueOf(length).toByteArray();
-                //Log.e("RV...", "lengthByteArr " + lengthByteArr.length);
-
-                for (i = 0; i < 4 - lengthByteArr.length; ++i) {
-                    sendBuffer.push((byte) 0);
-                    sendBuf[7 - CurPost] = (byte) 0;
-                    CurPost++;
-                }
-
-                Log.e("RVNEW.....", "curPost: " + CurPost);
-                for (i = 0; i < lengthByteArr.length; ++i) {
-                    sendBuffer.push(lengthByteArr[i]);
-                    sendBuf[7 - CurPost] = lengthByteArr[i];
-                    CurPost++;
-                }
-
-                Log.e("RVNEW.....", "curPost: " + CurPost);
-                //isSendingDataReady = true;
-
-                for (i = 0; i < 8; ++i) {
-                    Log.e("RVNEW...", "Val " + i + ":" + sendBuf[i] + " and " + sendBuffer.pop());
-
-                }
-
-                Log.e("RV...", "I am here 2");
-                streamOut.write(sendBuf, 0, 8);
-                isProcessingPacket = false;
-                //available.release();
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-        }
-
-        private void sendResponse(byte[] sendBuf, int id, int length) {
+        public void constructHeaderField(byte[] data) {
             try {
                 available.acquire();
-                for (int i = 0; i < sendBuf.length; ++i) {
-                    sendBuffer.push(sendBuf[length - i - 1]);
-                }
-
-                byte idByteArr[] = BigInteger.valueOf(id).toByteArray();
-                for (int i = 0; i < 4 - idByteArr.length; ++i) {
-                    sendBuffer.push((byte) 0);
-                }
-
-                for (int i = 0; i < idByteArr.length; ++i) {
-                    sendBuffer.push(idByteArr[i]);
-                }
-
-                byte lengthByteArr[] = BigInteger.valueOf(length).toByteArray();
-                //Log.e("RV...", "lengthByteArr " + lengthByteArr.length);
-
-                for (int i = 0; i < 4 - lengthByteArr.length; ++i) {
-                    sendBuffer.push((byte) 0);
-                }
-
-                for (int i = 0; i < lengthByteArr.length; ++i) {
-                    sendBuffer.push(lengthByteArr[i]);
-                }
-                isSendingDataReady = true;
-                Log.e("RV...", "I am here 2");
-                isProcessingPacket = false;
+                streamOut.write(data, 0, data.length);
+                streamOut.flush();
                 available.release();
-            } catch (InterruptedException e) {
+            } catch (IOException e) {
+                e.printStackTrace();
+            } catch (InterruptedException e){
                 e.printStackTrace();
             }
         }
 
-        public void parseReceivedPacket() {
+        public void constructHeader(int id, int length) {
+            byte[] sendBuf = new byte[8];
+            int i = 0;
+            for(i = 0; i < 4; ++i) {
+                sendBuf[i] = (byte) (id >> (i * 8));
+            }
+
+            for(i = 0; i < 4; ++i) {
+                sendBuf[4 + i] = (byte) (length >> (i * 8));
+            }
+
+            try {
+                available.acquire();
+                streamOut.write(sendBuf, 0, sendBuf.length);
+                streamOut.flush();
+                available.release();
+            } catch (IOException e) {
+                e.printStackTrace();
+            } catch (InterruptedException e){
+                e.printStackTrace();
+            }
+
+        }
+        public void constructHeaderField(int fieldValue)
+        {
+            int i = 0;
+            byte[] sendBufLength = new byte[4];
+            for (i = 0; i < 4; i++) {
+                sendBufLength[i] = (byte) (fieldValue >> (i * 8));
+            }
+            try {
+                available.acquire();
+                streamOut.write(sendBufLength, 0, sendBufLength.length);
+                streamOut.flush();
+                available.release();
+            } catch (IOException e) {
+                e.printStackTrace();
+            } catch (InterruptedException e){
+                e.printStackTrace();
+            }
+        }
+
+        private int parseHeaderField(int size)
+        {
+            byte[] rawStreamData = new byte[size];
+
+            for (int i = 0; i < size; i++) {
+                rawStreamData[i] = receiveBuffer.removeFirst();
+            }
+
+            ByteBuffer buffer = ByteBuffer.wrap(rawStreamData);
+            buffer.order(ByteOrder.BIG_ENDIAN);
+            return buffer.getInt();
+        }
+
+        private void parseReceivedPacket() {
+            final int ID_FIELD_SIZE = 4;
+            final int LENGTH_FIELD_SIZE = 4;
+            final int HEADER_SIZE = ID_FIELD_SIZE + LENGTH_FIELD_SIZE;
+
             if (isReceivingPayload == false) {
-                if (receiveBuffer.size() >= 2 * HEADER_SIZE) {
-                    Log.e("RV3...", "REceivingPayload: " + isReceivingPayload);
-                    byte[] length =  new byte[HEADER_SIZE];
-                    Log.e("MKRV...", "ReceiveQueue before pop: " + receiveBuffer.toString());
-                    for (int i = 0; i < HEADER_SIZE; i++) {
-                        length[i] = receiveBuffer.removeFirst();
-                    }
-                    Log.e("MKRV...", "ReceiveQueue after pop: " + receiveBuffer.toString());
+                if (receiveBuffer.size() >= HEADER_SIZE) {
 
-                    Log.e("MKRV....:", "length data: " + length.toString());
-
-                    ByteBuffer buffer = ByteBuffer.wrap(length);
-                    buffer.order(ByteOrder.BIG_ENDIAN);
-                    payloadSize = buffer.getInt();
-
-                    byte[] length1 = new byte[HEADER_SIZE];
-                    Log.e("MKRV...", "ReceiveQueue before pop: " + receiveBuffer.toString());
-                    for (int i = 0; i < HEADER_SIZE; i++) {
-                        length1[i] = receiveBuffer.removeFirst();
-                    }
-                    Log.e("MKRV...", "ReceiveQueue after pop: " + receiveBuffer.toString());
-
-                    Log.e("MKRV....:", "payid data: " + length.toString());
-
-                    ByteBuffer buffer1 = ByteBuffer.wrap(length1);
-                    buffer1.order(ByteOrder.BIG_ENDIAN);
-                    payloadId = buffer1.getInt();
-                    Log.e("RV3....:", "PAYLOAD_ID: " + Integer.toString(payloadId));
+                    payloadSize = parseHeaderField(LENGTH_FIELD_SIZE);
+                    payloadId = parseHeaderField(ID_FIELD_SIZE);
 
                     Log.e("MKRV.........", "...............Payload Size: " + payloadSize);
                     Log.e("MKRV.........", "...............Payload id: " + payloadId);
@@ -1924,21 +1847,20 @@ public class Camera2RawFragment extends Fragment implements View.OnClickListener
             }
 
             if (isReceivingPayload == true) {
-                // Log.e("RVNEW...", "...............receiveBuffer: " + receiveBuffer.size());
-
                 if (receiveBuffer.size() >= payloadSize) {
                     byte[] payload = new byte[payloadSize];
-                    Log.e("MKRV...", "ReceiveQueue before pop: " + receiveBuffer.toString());
                     for (int i = 0; i < payloadSize; i++) {
                         payload[payloadSize - i - 1] = receiveBuffer.removeFirst();
                     }
-                    Log.e("MKRV........", "ReceiveQueue after pop: " + receiveBuffer.toString());
-                    isProcessingPacket = true;
 
                     if (payloadId == 1) {
-                        Log.e("MKRV...", ".......Payload info: " + new String(payload));
-                        sendEchoBack(payloadId);
-                    } else if (payloadId == 3) {
+                        byte[] send_data = {' ', 'A', 'C', 'K'};
+
+                        constructHeader(payload.length + send_data.length, payloadId + 1);
+                        constructHeaderField(send_data);
+                        constructHeaderField(payload);
+                    }
+                    else if (payloadId == 3) {
                         Log.e("RVNEW.......", ".......Payload info: " + new String(payload));
                         Log.e("RV....", "responding to takePicture request");
                         String[] requestArgs = (new String(payload)).split(";");
@@ -1972,12 +1894,6 @@ public class Camera2RawFragment extends Fragment implements View.OnClickListener
                         Log.e("RV3....................", "############Calling Taking Picture##########");
 
                         takePicture();
-
-                        try {
-                            Thread.sleep(1000);
-                        } catch (InterruptedException e) {
-                            e.printStackTrace();
-                        }
                     }
                     isReceivingPayload = false;
                 }
@@ -1993,9 +1909,11 @@ public class Camera2RawFragment extends Fragment implements View.OnClickListener
 
                 while (done == false) {
                     try {
-                        byte[] line = new byte[256];
+                        final int RECEIVE_BUF_SIZE = 512;
+                        byte[] line = new byte[RECEIVE_BUF_SIZE];
+
                         if (streamIn_new.available() > 0) {
-                            int readData = streamIn_new.read(line, 0, 256);
+                            int readData = streamIn_new.read(line, 0, RECEIVE_BUF_SIZE);
 
                             if (readData > 0) {
                                 Log.e("MKRV....", "----------------------------------------");
@@ -2005,7 +1923,6 @@ public class Camera2RawFragment extends Fragment implements View.OnClickListener
                                 Log.e("MKRV....:", "received data: " + receiveBuffer.toString());
                             }
                             Log.e("MRKV...", "RxBufSize: " + receiveBuffer.size());
-                            Log.e("RV...", "IsProcessing: : " + isProcessingPacket);
                         }
 
                         if (!receiveBuffer.isEmpty()) {
@@ -2013,42 +1930,11 @@ public class Camera2RawFragment extends Fragment implements View.OnClickListener
                             parseReceivedPacket();
                         }
 
-                        try {
-                            available.acquire();
-                            if (picArray.size() != 0) {
-                                isSendingDataReady = true;
-                            }
-
-                            if (isSendingDataReady == true) {
-                                Log.e("RV...", "I am here 3");
-                                if (sendBuffer.isEmpty() != true) {
-                                    Log.e("RV...", "I am here 4");
-                                    int sendSize = sendBuffer.size();
-                                    byte[] sendBuf = new byte[sendSize];
-
-                                    for (int i = 0; i < sendSize; ++i) {
-                                        sendBuf[i] = sendBuffer.pop();
-                                    }
-                                    streamOut.write(sendBuf, 0, sendSize);
-                                    Log.e("RV...", "sent data: " + sendSize);
-
-                                } else if (picArray.size() > 0) {
-                                    byte[] test = picArray.pop();
-
-                                    Log.e("RV...", "size after popping " + test.length);
-                                }
-                                isSendingDataReady = false;
-                            }
-                            available.release();
-                        } catch (InterruptedException e) {
-                            e.printStackTrace();
-                        }
                     } catch (IOException ioe) {
                         Log.e("RV..EXCEPT.....", ioe.getLocalizedMessage());
                         done = true;
                     }
                 }
-                closeStream();
             } catch (IOException ioe) {
                 Log.e("RV..EXCEPT.....", ioe.getLocalizedMessage());
             } finally {
@@ -2072,8 +1958,6 @@ public class Camera2RawFragment extends Fragment implements View.OnClickListener
         }
 
         private void openStream() throws IOException {
-            //streamIn = new DataInputStream(new BufferedInputStream(socket.getInputStream()));
-            streamIn = new BufferedReader(new InputStreamReader(socket.getInputStream()));
             streamOut = new DataOutputStream(socket.getOutputStream());
             streamIn_new = new DataInputStream(socket.getInputStream());
         }
@@ -2084,8 +1968,6 @@ public class Camera2RawFragment extends Fragment implements View.OnClickListener
         }
 
         private void closeStream() throws IOException {
-            if (streamIn != null)
-                streamIn.close();
             if (streamIn_new != null)
                 streamIn_new.close();
 
@@ -2093,5 +1975,4 @@ public class Camera2RawFragment extends Fragment implements View.OnClickListener
                 streamOut.close();
         }
     }
-
 }
